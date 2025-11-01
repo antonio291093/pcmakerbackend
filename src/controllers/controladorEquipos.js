@@ -15,24 +15,23 @@ const {
 exports.crearEquipo = async (req, res) => {
   const client = await pool.connect();
   try {
-    await client.query("BEGIN");
-    // 1. Crear equipo principal
-    const equipo = await crearEquipo(req.body, client);
+    await client.query("BEGIN");    
+    
+    const tecnico_id = req.userId;    
+    const dataEquipo = { ...req.body, tecnico_id };
 
-    // 2. SOLO si equipo está en estado ARMADO (4), asigna módulos/discos
+    // 1. Crear equipo principal con el técnico asignado
+    const equipo = await crearEquipo(dataEquipo, client);
+
+    // 2. SOLO si el equipo está en estado ARMADO (4), asigna módulos/discos
     if (req.body.estado_id === 4) {
       if (req.body.ramModules && req.body.ramModules.length > 0) {
         await asignarRamAEquipo(equipo.id, req.body.ramModules, client);
       }
       if (req.body.storages && req.body.storages.length > 0) {
-        await asignarAlmacenamientoAEquipo(
-          equipo.id,
-          req.body.storages,
-          client
-        );
+        await asignarAlmacenamientoAEquipo(equipo.id, req.body.storages, client);
       }
     }
-    // Si no está en armado, NO impactes las tablas pivote
 
     await client.query("COMMIT");
     res.status(201).json(equipo);
@@ -73,8 +72,10 @@ exports.obtenerEquipoPorId = async (req, res) => {
 
 exports.actualizarEquipo = async (req, res) => {
   const id = parseInt(req.params.id);
+  const tecnico_id = req.user?.id; // viene del token JWT
+  
   try {
-    // Filtrar sólo campos válidos del body
+    // Campos válidos que SÍ pueden venir del body
     const camposValidos = [
       "nombre",
       "descripcion",
@@ -85,18 +86,27 @@ exports.actualizarEquipo = async (req, res) => {
       "estado_id",
       "sucursal_id",
     ];
+
+    // Filtrar solo los campos válidos enviados
     const body = Object.fromEntries(
       Object.entries(req.body).filter(
         ([k, v]) => camposValidos.includes(k) && v !== undefined
       )
     );
+
+    // ✅ Siempre agregar el técnico que hace la modificación
+    body.tecnico_id = tecnico_id;
+
     if (Object.keys(body).length === 0) {
       return res.status(400).json({ message: "No hay campos para actualizar" });
     }
+
     const equipoActualizado = await actualizarEquipo(id, body);
+
     if (!equipoActualizado) {
       return res.status(404).json({ message: "Equipo no encontrado" });
     }
+
     res.json(equipoActualizado);
   } catch (error) {
     console.error("Error al actualizar equipo:", error);

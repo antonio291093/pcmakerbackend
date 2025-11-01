@@ -8,15 +8,18 @@ async function crearEquipo({
   procesador,
   lote_etiqueta_id,
   estado_id,
-  sucursal_id, // nuevo parámetro
-}) {
+  sucursal_id,
+  tecnico_id,
+}, client) {
   const query = `
     INSERT INTO equipos (
-      nombre, descripcion, cantidad, tipo, procesador, lote_etiqueta_id, estado_id, sucursal_id
+      nombre, descripcion, cantidad, tipo, procesador,
+      lote_etiqueta_id, estado_id, sucursal_id, tecnico_id
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     RETURNING *;
   `;
+
   const values = [
     nombre,
     descripcion,
@@ -25,9 +28,11 @@ async function crearEquipo({
     procesador,
     lote_etiqueta_id,
     estado_id,
-    sucursal_id, // nuevo valor
+    sucursal_id,
+    tecnico_id,
   ];
-  const { rows } = await pool.query(query, values);
+
+  const { rows } = await client.query(query, values); // 👈 usar client, no pool
   return rows[0];
 }
 

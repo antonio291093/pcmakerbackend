@@ -49,6 +49,7 @@ const comisionesRutas = require("./routes/comisionesRutas");
 const mantenimientosRutas = require("./routes/mantenimientosRutas");
 const sucursalesRutas = require("./routes/sucursalesRutas");
 const catalogoMantenimientoRoutes = require("./routes/catalogoMantenimientoRutas");
+const historial = require("./routes/historialRutas");
 
 // Usa las rutas
 app.use("/api/usuarios", usuariosRoutes);
@@ -62,5 +63,6 @@ app.use("/api/comisiones", comisionesRutas);
 app.use("/api/mantenimientos", mantenimientosRutas);
 app.use("/api/sucursales", sucursalesRutas);
 app.use("/api/catalogoMantenimiento", catalogoMantenimientoRoutes);
+app.use("/api/historial-tecnico",historial);
 
 module.exports = { app, pool };

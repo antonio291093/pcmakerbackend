@@ -72,7 +72,7 @@ exports.obtenerEquipoPorId = async (req, res) => {
 
 exports.actualizarEquipo = async (req, res) => {
   const id = parseInt(req.params.id);
-  const tecnico_id = req.user?.id; // viene del token JWT
+  const tecnico_id = req.userId;    
   
   try {
     // Campos válidos que SÍ pueden venir del body
@@ -85,6 +85,7 @@ exports.actualizarEquipo = async (req, res) => {
       "lote_etiqueta_id",
       "estado_id",
       "sucursal_id",
+      "tecnico_id",
     ];
 
     // Filtrar solo los campos válidos enviados

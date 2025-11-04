@@ -20,6 +20,8 @@ router.post(
 // Crear ítem inventario (protegida)
 router.post("/", authMiddleware, inventarioController.crearInventario);
 
+router.post('/general', authMiddleware, inventarioController.crearInventarioGeneral);
+
 // Obtener todo inventario (protegida)
 router.get("/", authMiddleware, inventarioController.obtenerInventario);
 

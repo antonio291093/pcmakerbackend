@@ -7,6 +7,7 @@ const {
   descontarStockInventario,
   aumentarStockInventario,
   validarStockInventario,
+  crearInventarioGeneral,
 } = require("../models/inventario");
 
 exports.aumentarStockInventario = async (req, res) => {
@@ -50,6 +51,19 @@ exports.crearInventario = async (req, res) => {
   }
 };
 
+/** ----------------------------------------------------
+ * CREAR INVENTARIO GENERAL
+ * ---------------------------------------------------- */
+exports.crearInventarioGeneral = async (req, res) => {
+  try {
+    const nuevo = await crearInventarioGeneral(req.body);
+    res.status(201).json(nuevo);
+  } catch (error) {
+    console.error("Error al crear inventario general:", error);
+    res.status(500).json({ message: "Error al crear inventario general" });
+  }
+};
+
 // Obtener todo inventario
 exports.obtenerInventario = async (req, res) => {
   try {
@@ -76,20 +90,23 @@ exports.obtenerInventarioPorId = async (req, res) => {
   }
 };
 
-// Actualizar ítem inventario
 exports.actualizarInventario = async (req, res) => {
-  const id = parseInt(req.params.id);
   try {
-    const itemActualizado = await actualizarInventario(id, req.body);
-    if (!itemActualizado) {
-      return res.status(404).json({ message: "Ítem no encontrado" });
-    }
-    res.json(itemActualizado);
+    const { id } = req.params;
+    const datos = req.body;
+
+    const actualizado = await actualizarInventario(id, datos);
+
+    if (!actualizado)
+      return res.status(404).json({ message: "Inventario no encontrado" });
+
+    res.json(actualizado);
   } catch (error) {
     console.error("Error al actualizar inventario:", error);
-    res.status(500).json({ message: "Error en el servidor" });
+    res.status(500).json({ message: "Error al actualizar inventario" });
   }
 };
+
 
 // Eliminar ítem inventario
 exports.eliminarInventario = async (req, res) => {

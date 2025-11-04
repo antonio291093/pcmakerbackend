@@ -109,14 +109,12 @@ async function obtenerInventarioPorId(id) {
   return rows[0];
 }
 
-/** ----------------------------------------------------
- * ACTUALIZAR INVENTARIO
- * ---------------------------------------------------- */
 async function actualizarInventario(
   id,
   {
     tipo,
     especificacion,
+    descripcion,
     cantidad,
     disponibilidad,
     estado,
@@ -125,12 +123,16 @@ async function actualizarInventario(
     sucursal_id = null,
   }
 ) {
-  const query = `
+  // 🧩 Si no hay especificacion pero sí descripcion, úsala
+  if (!especificacion && descripcion) {
+    especificacion = descripcion;
+  }
+
+  const updateQuery = `
     UPDATE inventario
     SET tipo = $1, especificacion = $2, cantidad = $3, disponibilidad = $4, estado = $5,
         memoria_ram_id = $6, almacenamiento_id = $7, sucursal_id = $8
-    WHERE id = $9
-    RETURNING *;
+    WHERE id = $9;
   `;
   const values = [
     tipo,
@@ -143,9 +145,30 @@ async function actualizarInventario(
     sucursal_id,
     id,
   ];
-  const { rows } = await pool.query(query, values);
+
+  await pool.query(updateQuery, values);
+
+  const selectQuery = `
+    SELECT 
+      i.id,
+      i.tipo,
+      COALESCE(cm.descripcion, ca.descripcion, i.especificacion) AS descripcion,
+      i.cantidad,
+      i.disponibilidad,
+      i.estado,
+      i.memoria_ram_id,
+      i.almacenamiento_id,
+      i.sucursal_id,
+      i.fecha_creacion
+    FROM inventario i
+    LEFT JOIN catalogo_memoria_ram cm ON i.memoria_ram_id = cm.id
+    LEFT JOIN catalogo_almacenamiento ca ON i.almacenamiento_id = ca.id
+    WHERE i.id = $1;
+  `;
+  const { rows } = await pool.query(selectQuery, [id]);
   return rows[0];
 }
+
 
 /** ----------------------------------------------------
  * ELIMINAR INVENTARIO
@@ -261,6 +284,32 @@ async function validarStockInventario({
   return rows[0].cantidad >= cantidad;
 }
 
+/** ----------------------------------------------------
+ * CREAR INVENTARIO GENERAL
+ * ---------------------------------------------------- */
+async function crearInventarioGeneral({
+  tipo,
+  descripcion,
+  cantidad = 1,
+  disponibilidad = true,
+  estado = "usado",
+  sucursal_id,
+}) {
+  if (!tipo || !descripcion || !sucursal_id)
+    throw new Error("Faltan datos requeridos");
+
+  const insertQuery = `
+    INSERT INTO inventario 
+      (tipo, especificacion, cantidad, disponibilidad, estado, sucursal_id)
+    VALUES ($1, $2, $3, $4, $5, $6)
+    RETURNING *;
+  `;
+  const values = [tipo, descripcion, cantidad, disponibilidad, estado, sucursal_id];
+
+  const { rows } = await pool.query(insertQuery, values);
+  return rows[0];
+}
+
 module.exports = {
   agregarOActualizarInventario,
   obtenerInventario,
@@ -270,4 +319,5 @@ module.exports = {
   descontarStockInventario,
   aumentarStockInventario,
   validarStockInventario,
+  crearInventarioGeneral,
 };

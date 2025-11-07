@@ -17,6 +17,13 @@ router.post(
   inventarioController.aumentarStockInventario
 );
 
+// Descontar stock desde venta
+router.post(
+  "/descontar-venta",
+  authMiddleware,
+  inventarioController.descontarStockVenta
+);
+
 // Crear ítem inventario (protegida)
 router.post("/", authMiddleware, inventarioController.crearInventario);
 

@@ -51,6 +51,8 @@ const sucursalesRutas = require("./routes/sucursalesRutas");
 const catalogoMantenimientoRoutes = require("./routes/catalogoMantenimientoRutas");
 const historial = require("./routes/historialRutas");
 const configuracion = require("./routes/configuracionesRutas");
+const cajaRoutes = require("./routes/cajaRutas");
+const ventasRoutes = require("./routes/ventasRutas");
 
 // Usa las rutas
 app.use("/api/usuarios", usuariosRoutes);
@@ -66,5 +68,7 @@ app.use("/api/sucursales", sucursalesRutas);
 app.use("/api/catalogoMantenimiento", catalogoMantenimientoRoutes);
 app.use("/api/historial-tecnico",historial);
 app.use("/api/configuraciones", configuracion)
+app.use("/api/caja", cajaRoutes);
+app.use("/api/ventas", ventasRoutes);
 
 module.exports = { app, pool };

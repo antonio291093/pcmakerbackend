@@ -1,14 +1,52 @@
 const pool = require("../config/db");
 
-/** ----------------------------------------------------
- * AGREGAR O ACTUALIZAR INVENTARIO (por sucursal)
- * ---------------------------------------------------- */
+/**
+ * DESCONTAR STOCK (exclusivo para ventas)
+ * ----------------------------------------
+ * Disminuye la cantidad de un producto en inventario según su ID.
+ */
+async function descontarStockVenta({ producto_id, cantidad = 1, sucursal_id }) {
+  if (!producto_id || !sucursal_id)
+    throw new Error("Debe proporcionar producto_id y sucursal_id");
+
+  // Verificar existencia
+  const buscarQuery = `
+    SELECT * FROM inventario
+    WHERE id = $1 AND sucursal_id = $2
+    LIMIT 1;
+  `;
+  const { rows } = await pool.query(buscarQuery, [producto_id, sucursal_id]);
+  const producto = rows[0];
+
+  if (!producto) throw new Error("Producto no encontrado en inventario");
+
+  // Validar stock suficiente
+  if (producto.cantidad < cantidad)
+    throw new Error(`Stock insuficiente. Disponible: ${producto.cantidad}`);
+
+  // Descontar stock
+  const nuevaCantidad = producto.cantidad - cantidad;
+  const updateQuery = `
+    UPDATE inventario
+    SET cantidad = $1
+    WHERE id = $2
+    RETURNING *;
+  `;
+  const { rows: updateRows } = await pool.query(updateQuery, [
+    nuevaCantidad,
+    producto.id,
+  ]);
+
+  return updateRows[0];
+}
+
 async function agregarOActualizarInventario({
   tipo,
   especificacion,
   cantidad = 1,
   disponibilidad = true,
   estado = "usado",
+  precio = 0, 
   memoria_ram_id = null,
   almacenamiento_id = null,
   sucursal_id = null,
@@ -38,17 +76,20 @@ async function agregarOActualizarInventario({
   const { rows } = await pool.query(buscarQuery, buscarValues);
 
   if (rows.length > 0) {
-    // ✅ Ya existe: actualizar cantidad
+    // ✅ Ya existe: actualizar cantidad y precio (opcional)
     const inventario = rows[0];
     const nuevaCantidad = inventario.cantidad + cantidad;
+
     const updateQuery = `
       UPDATE inventario
-      SET cantidad = $1
-      WHERE id = $2
+      SET cantidad = $1,
+          precio = $2
+      WHERE id = $3
       RETURNING *;
     `;
     const { rows: updateRows } = await pool.query(updateQuery, [
       nuevaCantidad,
+      precio,
       inventario.id,
     ]);
     return updateRows[0];
@@ -56,8 +97,8 @@ async function agregarOActualizarInventario({
     // 🆕 No existe: crear nuevo registro
     const insertQuery = `
       INSERT INTO inventario 
-        (tipo, especificacion, cantidad, disponibilidad, estado, memoria_ram_id, almacenamiento_id, sucursal_id)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        (tipo, especificacion, cantidad, disponibilidad, estado, precio, memoria_ram_id, almacenamiento_id, sucursal_id)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *;
     `;
     const insertValues = [
@@ -66,10 +107,12 @@ async function agregarOActualizarInventario({
       cantidad,
       disponibilidad,
       estado,
+      precio,
       memoria_ram_id,
       almacenamiento_id,
       sucursal_id,
     ];
+
     const { rows: insertRows } = await pool.query(insertQuery, insertValues);
     return insertRows[0];
   }
@@ -85,6 +128,7 @@ async function obtenerInventario() {
       i.tipo,
       COALESCE(cm.descripcion, ca.descripcion, i.especificacion) AS descripcion,
       i.cantidad,
+      i.precio,
       i.disponibilidad,
       i.estado,
       i.memoria_ram_id,
@@ -118,6 +162,7 @@ async function actualizarInventario(
     cantidad,
     disponibilidad,
     estado,
+    precio,
     memoria_ram_id = null,
     almacenamiento_id = null,
     sucursal_id = null,
@@ -130,16 +175,25 @@ async function actualizarInventario(
 
   const updateQuery = `
     UPDATE inventario
-    SET tipo = $1, especificacion = $2, cantidad = $3, disponibilidad = $4, estado = $5,
-        memoria_ram_id = $6, almacenamiento_id = $7, sucursal_id = $8
-    WHERE id = $9;
+    SET tipo = $1,
+        especificacion = $2,
+        cantidad = $3,
+        disponibilidad = $4,
+        estado = $5,
+        precio = $6,
+        memoria_ram_id = $7,
+        almacenamiento_id = $8,
+        sucursal_id = $9
+    WHERE id = $10;
   `;
+
   const values = [
     tipo,
     especificacion,
     cantidad,
     disponibilidad,
     estado,
+    precio,
     memoria_ram_id,
     almacenamiento_id,
     sucursal_id,
@@ -156,6 +210,7 @@ async function actualizarInventario(
       i.cantidad,
       i.disponibilidad,
       i.estado,
+      i.precio, -- ✅ incluir el precio en el retorno
       i.memoria_ram_id,
       i.almacenamiento_id,
       i.sucursal_id,
@@ -165,10 +220,10 @@ async function actualizarInventario(
     LEFT JOIN catalogo_almacenamiento ca ON i.almacenamiento_id = ca.id
     WHERE i.id = $1;
   `;
+
   const { rows } = await pool.query(selectQuery, [id]);
   return rows[0];
 }
-
 
 /** ----------------------------------------------------
  * ELIMINAR INVENTARIO
@@ -284,9 +339,6 @@ async function validarStockInventario({
   return rows[0].cantidad >= cantidad;
 }
 
-/** ----------------------------------------------------
- * CREAR INVENTARIO GENERAL
- * ---------------------------------------------------- */
 async function crearInventarioGeneral({
   tipo,
   descripcion,
@@ -294,17 +346,27 @@ async function crearInventarioGeneral({
   disponibilidad = true,
   estado = "usado",
   sucursal_id,
+  precio = 0, // ✅ nuevo campo
 }) {
   if (!tipo || !descripcion || !sucursal_id)
     throw new Error("Faltan datos requeridos");
 
   const insertQuery = `
     INSERT INTO inventario 
-      (tipo, especificacion, cantidad, disponibilidad, estado, sucursal_id)
-    VALUES ($1, $2, $3, $4, $5, $6)
+      (tipo, especificacion, cantidad, disponibilidad, estado, sucursal_id, precio)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
     RETURNING *;
   `;
-  const values = [tipo, descripcion, cantidad, disponibilidad, estado, sucursal_id];
+
+  const values = [
+    tipo,
+    descripcion,
+    cantidad,
+    disponibilidad,
+    estado,
+    sucursal_id,
+    precio, // ✅ incluirlo en la inserción
+  ];
 
   const { rows } = await pool.query(insertQuery, values);
   return rows[0];
@@ -320,4 +382,5 @@ module.exports = {
   aumentarStockInventario,
   validarStockInventario,
   crearInventarioGeneral,
+  descontarStockVenta, 
 };

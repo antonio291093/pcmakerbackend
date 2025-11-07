@@ -8,6 +8,7 @@ const {
   aumentarStockInventario,
   validarStockInventario,
   crearInventarioGeneral,
+  descontarStockVenta,
 } = require("../models/inventario");
 
 exports.aumentarStockInventario = async (req, res) => {
@@ -140,5 +141,51 @@ exports.validarStockInventario = async (req, res) => {
   } catch (error) {
     console.error("Error validando stock:", error);
     res.status(500).json({ error: "Error interno al validar stock" });
+  }
+};
+
+exports.descontarStockVenta = async (req, res) => {
+  try {
+    const { productos, sucursal_id } = req.body;
+
+    // 🧩 Validaciones
+    if (!sucursal_id || !Array.isArray(productos) || productos.length === 0) {
+      return res.status(400).json({
+        message: "sucursal_id y al menos un producto son requeridos",
+      });
+    }
+
+    const resultados = [];
+
+    // 🔁 Descontar cada producto
+    for (const item of productos) {
+      const { producto_id, cantidad_vendida } = item;
+
+      if (!producto_id || !cantidad_vendida) {
+        return res.status(400).json({
+          message: "Cada producto debe tener producto_id y cantidad_vendida",
+        });
+      }
+
+      const actualizado = await descontarStockVenta({
+        producto_id,
+        cantidad: cantidad_vendida,
+        sucursal_id,
+      });
+
+      resultados.push(actualizado);
+    }
+
+    // ✅ Todo correcto
+    res.status(200).json({
+      message: "Stock actualizado correctamente para todos los productos",
+      resultados,
+    });
+  } catch (error) {
+    console.error("❌ Error al descontar stock desde venta:", error);
+    res.status(500).json({
+      message: "Error en el servidor al descontar stock",
+      error: error.message,
+    });
   }
 };

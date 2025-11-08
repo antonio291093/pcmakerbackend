@@ -9,7 +9,32 @@ const {
   validarStockInventario,
   crearInventarioGeneral,
   descontarStockVenta,
+  insertarEquipoEnInventario,
 } = require("../models/inventario");
+
+/** ----------------------------------------------------
+ * REGISTRAR EQUIPO EN INVENTARIO
+ * ---------------------------------------------------- */
+exports.registrarEquipo = async (req, res) => {
+  try {
+    const { equipo_id, sucursal_id, precio } = req.body;
+
+    if (!equipo_id) {
+      return res.status(400).json({ error: "El campo equipo_id es obligatorio." });
+    }
+
+    const nuevoRegistro = await insertarEquipoEnInventario(equipo_id, sucursal_id, precio);
+
+    res.status(201).json({
+      success: true,
+      message: "Equipo registrado en inventario correctamente.",
+      data: nuevoRegistro
+    });
+  } catch (error) {
+    console.error("Error registrando equipo en inventario:", error);
+    res.status(500).json({ error: "Error registrando equipo en inventario." });
+  }
+};
 
 exports.aumentarStockInventario = async (req, res) => {
   try {
@@ -26,7 +51,6 @@ exports.aumentarStockInventario = async (req, res) => {
   }
 };
 
-// Controlador para descontar stock
 exports.descontarStockInventario = async (req, res) => {
   try {
     const { memoria_ram_id, almacenamiento_id, cantidad } = req.body;
@@ -52,9 +76,6 @@ exports.crearInventario = async (req, res) => {
   }
 };
 
-/** ----------------------------------------------------
- * CREAR INVENTARIO GENERAL
- * ---------------------------------------------------- */
 exports.crearInventarioGeneral = async (req, res) => {
   try {
     const nuevo = await crearInventarioGeneral(req.body);
@@ -65,7 +86,6 @@ exports.crearInventarioGeneral = async (req, res) => {
   }
 };
 
-// Obtener todo inventario
 exports.obtenerInventario = async (req, res) => {
   try {
     const items = await obtenerInventario();
@@ -76,7 +96,6 @@ exports.obtenerInventario = async (req, res) => {
   }
 };
 
-// Obtener ítem inventario por ID
 exports.obtenerInventarioPorId = async (req, res) => {
   const id = parseInt(req.params.id);
   try {

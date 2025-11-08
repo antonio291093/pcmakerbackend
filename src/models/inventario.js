@@ -1,5 +1,27 @@
 const pool = require("../config/db");
 
+/** ----------------------------------------------------
+ * INSERTAR EQUIPO EN INVENTARIO
+ * ---------------------------------------------------- */
+async function insertarEquipoEnInventario(equipo_id, sucursal_id = null, precio = 0, disponibilidad = true) {
+  const query = `
+    INSERT INTO inventario (equipo_id, sucursal_id, tipo, cantidad, estado, disponibilidad, fecha_creacion, precio)
+    VALUES ($1, $2, 'Equipo Armado', 1, 'nuevo', $3, NOW(), $4)
+    RETURNING *;
+  `;
+  const { rows } = await pool.query(query, [equipo_id, sucursal_id, disponibilidad, precio]);
+  return rows[0];
+}
+
+/** ----------------------------------------------------
+ * ELIMINAR INVENTARIO
+ * ---------------------------------------------------- */
+async function eliminarInventario(id) {
+  const query = `DELETE FROM inventario WHERE id = $1 RETURNING *;`;
+  const { rows } = await pool.query(query, [id]);
+  return rows[0];
+}
+
 /**
  * DESCONTAR STOCK (exclusivo para ventas)
  * ----------------------------------------
@@ -383,4 +405,6 @@ module.exports = {
   validarStockInventario,
   crearInventarioGeneral,
   descontarStockVenta, 
+  insertarEquipoEnInventario,
+  eliminarInventario,
 };

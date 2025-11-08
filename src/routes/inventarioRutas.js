@@ -24,6 +24,9 @@ router.post(
   inventarioController.descontarStockVenta
 );
 
+// routes/inventario.js
+router.post('/registrar-equipo', authMiddleware, inventarioController.registrarEquipo);
+
 // Crear ítem inventario (protegida)
 router.post("/", authMiddleware, inventarioController.crearInventario);
 

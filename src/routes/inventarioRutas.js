@@ -25,15 +25,29 @@ router.post(
 );
 
 // routes/inventario.js
-router.post('/registrar-equipo', authMiddleware, inventarioController.registrarEquipo);
+router.post(
+  "/registrar-equipo",
+  authMiddleware,
+  inventarioController.registrarEquipo
+);
 
 // Crear ítem inventario (protegida)
 router.post("/", authMiddleware, inventarioController.crearInventario);
 
-router.post('/general', authMiddleware, inventarioController.crearInventarioGeneral);
+router.post(
+  "/general",
+  authMiddleware,
+  inventarioController.crearInventarioGeneral
+);
 
 // Obtener todo inventario (protegida)
 router.get("/", authMiddleware, inventarioController.obtenerInventario);
+
+router.get(
+  "/equipos-armados",
+  authMiddleware,
+  inventarioController.obtenerEquiposArmados
+);
 
 // Actualizar ítem inventario (protegida)
 router.put("/:id", authMiddleware, inventarioController.actualizarInventario);

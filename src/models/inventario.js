@@ -3,13 +3,23 @@ const pool = require("../config/db");
 /** ----------------------------------------------------
  * INSERTAR EQUIPO EN INVENTARIO
  * ---------------------------------------------------- */
-async function insertarEquipoEnInventario(equipo_id, sucursal_id = null, precio = 0, disponibilidad = true) {
+async function insertarEquipoEnInventario(
+  equipo_id,
+  sucursal_id = null,
+  precio = 0,
+  disponibilidad = true
+) {
   const query = `
     INSERT INTO inventario (equipo_id, sucursal_id, tipo, cantidad, estado, disponibilidad, fecha_creacion, precio)
     VALUES ($1, $2, 'Equipo Armado', 1, 'nuevo', $3, NOW(), $4)
     RETURNING *;
   `;
-  const { rows } = await pool.query(query, [equipo_id, sucursal_id, disponibilidad, precio]);
+  const { rows } = await pool.query(query, [
+    equipo_id,
+    sucursal_id,
+    disponibilidad,
+    precio,
+  ]);
   return rows[0];
 }
 
@@ -68,7 +78,7 @@ async function agregarOActualizarInventario({
   cantidad = 1,
   disponibilidad = true,
   estado = "usado",
-  precio = 0, 
+  precio = 0,
   memoria_ram_id = null,
   almacenamiento_id = null,
   sucursal_id = null,
@@ -160,7 +170,51 @@ async function obtenerInventario() {
     FROM inventario i
     LEFT JOIN catalogo_memoria_ram cm ON i.memoria_ram_id = cm.id
     LEFT JOIN catalogo_almacenamiento ca ON i.almacenamiento_id = ca.id
+    WHERE i.equipo_id IS NULL
     ORDER BY i.id ASC;
+  `;
+  const { rows } = await pool.query(query);
+  return rows;
+}
+
+async function obtenerEquiposArmados() {
+  const query = `
+    SELECT 
+      e.id,
+      e.nombre,
+      e.procesador,
+      le.etiqueta,
+      e.sucursal_id,
+      s.nombre AS sucursal_nombre,
+      i.precio,
+      i.estado,
+      i.disponibilidad,
+      -- Agrupa las memorias RAM asociadas
+      COALESCE(
+        (
+          SELECT json_agg(cmr.descripcion)
+          FROM equipos_ram er
+          JOIN catalogo_memoria_ram cmr ON er.memoria_ram_id = cmr.id
+          WHERE er.equipo_id = e.id
+        ),
+        '[]'
+      ) AS memorias_ram,
+      -- Agrupa los almacenamientos asociados
+      COALESCE(
+        (
+          SELECT json_agg(ca.descripcion)
+          FROM equipos_almacenamiento ea
+          JOIN catalogo_almacenamiento ca ON ea.almacenamiento_id = ca.id
+          WHERE ea.equipo_id = e.id
+        ),
+        '[]'
+      ) AS almacenamientos
+    FROM inventario i
+    JOIN equipos e ON i.equipo_id = e.id
+    JOIN lotes_etiquetas le ON e.lote_etiqueta_id = le.id
+    LEFT JOIN sucursales s ON e.sucursal_id = s.id
+    WHERE e.estado_id = 4 -- Armado
+    ORDER BY e.id ASC;
   `;
   const { rows } = await pool.query(query);
   return rows;
@@ -404,7 +458,8 @@ module.exports = {
   aumentarStockInventario,
   validarStockInventario,
   crearInventarioGeneral,
-  descontarStockVenta, 
+  descontarStockVenta,
   insertarEquipoEnInventario,
   eliminarInventario,
+  obtenerEquiposArmados,
 };

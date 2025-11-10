@@ -10,6 +10,7 @@ const {
   crearInventarioGeneral,
   descontarStockVenta,
   insertarEquipoEnInventario,
+  obtenerEquiposArmados,
 } = require("../models/inventario");
 
 /** ----------------------------------------------------
@@ -100,6 +101,16 @@ exports.obtenerInventario = async (req, res) => {
     res.json(items);
   } catch (error) {
     console.error("Error al obtener inventario:", error);
+    res.status(500).json({ message: "Error en el servidor" });
+  }
+};
+
+exports.obtenerEquiposArmados = async (req, res) => {
+  try {
+    const equipos = await obtenerEquiposArmados();
+    res.json(equipos);
+  } catch (error) {
+    console.error("Error al obtener equipos armados:", error);
     res.status(500).json({ message: "Error en el servidor" });
   }
 };

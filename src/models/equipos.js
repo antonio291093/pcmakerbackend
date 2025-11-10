@@ -1,16 +1,19 @@
 const pool = require("../config/db");
 
-async function crearEquipo({
-  nombre,
-  descripcion,
-  cantidad = 1,
-  tipo,
-  procesador,
-  lote_etiqueta_id,
-  estado_id,
-  sucursal_id,
-  tecnico_id,
-}, client) {
+async function crearEquipo(
+  {
+    nombre,
+    descripcion,
+    cantidad = 1,
+    tipo,
+    procesador,
+    lote_etiqueta_id,
+    estado_id,
+    sucursal_id,
+    tecnico_id,
+  },
+  client
+) {
   const query = `
     INSERT INTO equipos (
       nombre, descripcion, cantidad, tipo, procesador,
@@ -36,23 +39,31 @@ async function crearEquipo({
   return rows[0];
 }
 
-async function asignarRamAEquipo(equipo_id, ramModules) {
+async function asignarRamAEquipo(equipo_id, ramModules, client = pool) {
   for (const ram of ramModules) {
     const query = `
       INSERT INTO equipos_ram (equipo_id, memoria_ram_id, cantidad)
       VALUES ($1, $2, $3);
     `;
-    await pool.query(query, [equipo_id, ram.memoria_ram_id, ram.cantidad || 1]);
+    await client.query(query, [
+      equipo_id,
+      ram.memoria_ram_id,
+      ram.cantidad || 1,
+    ]);
   }
 }
 
-async function asignarAlmacenamientoAEquipo(equipo_id, storages) {
+async function asignarAlmacenamientoAEquipo(
+  equipo_id,
+  storages,
+  client = pool
+) {
   for (const storage of storages) {
     const query = `
       INSERT INTO equipos_almacenamiento (equipo_id, almacenamiento_id, rol)
       VALUES ($1, $2, $3);
     `;
-    await pool.query(query, [
+    await client.query(query, [
       equipo_id,
       storage.almacenamiento_id,
       storage.rol || null,

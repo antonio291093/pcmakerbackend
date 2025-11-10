@@ -20,15 +20,21 @@ exports.registrarEquipo = async (req, res) => {
     const { equipo_id, sucursal_id, precio } = req.body;
 
     if (!equipo_id) {
-      return res.status(400).json({ error: "El campo equipo_id es obligatorio." });
+      return res
+        .status(400)
+        .json({ error: "El campo equipo_id es obligatorio." });
     }
 
-    const nuevoRegistro = await insertarEquipoEnInventario(equipo_id, sucursal_id, precio);
+    const nuevoRegistro = await insertarEquipoEnInventario(
+      equipo_id,
+      sucursal_id,
+      precio
+    );
 
     res.status(201).json({
       success: true,
       message: "Equipo registrado en inventario correctamente.",
-      data: nuevoRegistro
+      data: nuevoRegistro,
     });
   } catch (error) {
     console.error("Error registrando equipo en inventario:", error);
@@ -53,11 +59,13 @@ exports.aumentarStockInventario = async (req, res) => {
 
 exports.descontarStockInventario = async (req, res) => {
   try {
-    const { memoria_ram_id, almacenamiento_id, cantidad } = req.body;
+    const { memoria_ram_id, almacenamiento_id, cantidad, sucursal_id } =
+      req.body;
     const itemActualizado = await descontarStockInventario({
       memoria_ram_id,
       almacenamiento_id,
       cantidad,
+      sucursal_id,
     });
     res.json(itemActualizado);
   } catch (error) {
@@ -127,7 +135,6 @@ exports.actualizarInventario = async (req, res) => {
   }
 };
 
-
 // Eliminar ítem inventario
 exports.eliminarInventario = async (req, res) => {
   const id = parseInt(req.params.id);
@@ -145,7 +152,8 @@ exports.eliminarInventario = async (req, res) => {
 
 exports.validarStockInventario = async (req, res) => {
   try {
-    const { memoria_ram_id, almacenamiento_id, cantidad } = req.query;
+    const { memoria_ram_id, almacenamiento_id, cantidad, sucursal_id } =
+      req.query;
     if (!cantidad)
       return res.status(400).json({ error: "Debe indicar cantidad a validar" });
 
@@ -154,6 +162,7 @@ exports.validarStockInventario = async (req, res) => {
       memoria_ram_id: memoria_ram_id ? parseInt(memoria_ram_id) : null,
       almacenamiento_id: almacenamiento_id ? parseInt(almacenamiento_id) : null,
       cantidad: cantidadNum,
+      sucursal_id: sucursal_id,
     });
 
     res.json({ tieneStock });

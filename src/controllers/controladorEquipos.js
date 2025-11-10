@@ -15,23 +15,13 @@ const {
 exports.crearEquipo = async (req, res) => {
   const client = await pool.connect();
   try {
-    await client.query("BEGIN");    
-    
-    const tecnico_id = req.userId;    
+    await client.query("BEGIN");
+
+    const tecnico_id = req.userId;
     const dataEquipo = { ...req.body, tecnico_id };
 
     // 1. Crear equipo principal con el técnico asignado
     const equipo = await crearEquipo(dataEquipo, client);
-
-    // 2. SOLO si el equipo está en estado ARMADO (4), asigna módulos/discos
-    if (req.body.estado_id === 4) {
-      if (req.body.ramModules && req.body.ramModules.length > 0) {
-        await asignarRamAEquipo(equipo.id, req.body.ramModules, client);
-      }
-      if (req.body.storages && req.body.storages.length > 0) {
-        await asignarAlmacenamientoAEquipo(equipo.id, req.body.storages, client);
-      }
-    }
 
     await client.query("COMMIT");
     res.status(201).json(equipo);
@@ -72,10 +62,13 @@ exports.obtenerEquipoPorId = async (req, res) => {
 
 exports.actualizarEquipo = async (req, res) => {
   const id = parseInt(req.params.id);
-  const tecnico_id = req.userId;    
-  
+  const tecnico_id = req.userId;
+  const client = await pool.connect();
+
   try {
-    // Campos válidos que SÍ pueden venir del body
+    await client.query("BEGIN");
+
+    // --- Campos válidos que se pueden actualizar ---
     const camposValidos = [
       "nombre",
       "descripcion",
@@ -85,33 +78,55 @@ exports.actualizarEquipo = async (req, res) => {
       "lote_etiqueta_id",
       "estado_id",
       "sucursal_id",
-      "tecnico_id",
     ];
 
-    // Filtrar solo los campos válidos enviados
     const body = Object.fromEntries(
       Object.entries(req.body).filter(
         ([k, v]) => camposValidos.includes(k) && v !== undefined
       )
     );
 
-    // ✅ Siempre agregar el técnico que hace la modificación
+    // Agregar técnico que hizo la modificación
     body.tecnico_id = tecnico_id;
 
     if (Object.keys(body).length === 0) {
+      await client.query("ROLLBACK");
       return res.status(400).json({ message: "No hay campos para actualizar" });
     }
 
-    const equipoActualizado = await actualizarEquipo(id, body);
-
+    // --- Actualizar equipo principal ---
+    const equipoActualizado = await actualizarEquipo(id, body, client);
     if (!equipoActualizado) {
+      await client.query("ROLLBACK");
       return res.status(404).json({ message: "Equipo no encontrado" });
     }
 
-    res.json(equipoActualizado);
+    // --- Actualizar RAM y almacenamiento si el estado es ARMADO (4) ---
+    if (req.body.estado_id === 4) {
+      // Limpiar las asociaciones anteriores (opcional)
+      await client.query("DELETE FROM equipos_ram WHERE equipo_id = $1", [id]);
+      await client.query(
+        "DELETE FROM equipos_almacenamiento WHERE equipo_id = $1",
+        [id]
+      );
+
+      // Asignar nuevas
+      if (req.body.ramModules && req.body.ramModules.length > 0) {
+        await asignarRamAEquipo(id, req.body.ramModules, client);
+      }
+      if (req.body.storages && req.body.storages.length > 0) {
+        await asignarAlmacenamientoAEquipo(id, req.body.storages, client);
+      }
+    }
+
+    await client.query("COMMIT");
+    res.status(200).json(equipoActualizado);
   } catch (error) {
+    await client.query("ROLLBACK");
     console.error("Error al actualizar equipo:", error);
     res.status(500).json({ message: "Error en el servidor" });
+  } finally {
+    client.release();
   }
 };
 
@@ -147,7 +162,6 @@ exports.buscarEquipoPorEtiqueta = async (req, res) => {
   }
 };
 
-// Obtener equipos filtrados por estado_id
 exports.obtenerEquiposPorEstado = async (req, res) => {
   const estadoId = parseInt(req.params.estado_id);
   if (isNaN(estadoId)) {

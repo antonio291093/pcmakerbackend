@@ -1,5 +1,132 @@
 const pool = require("../config/db");
 
+// 🔹 Obtener memorias RAM disponibles
+async function obtenerMemoriasRamDisponibles() {
+  const query = `
+    SELECT 
+      i.id,
+      cmr.descripcion,
+      i.cantidad,
+      i.precio,
+      s.nombre AS sucursal
+    FROM inventario i
+    JOIN catalogo_memoria_ram cmr ON i.memoria_ram_id = cmr.id
+    LEFT JOIN sucursales s ON i.sucursal_id = s.id
+    WHERE i.cantidad > 0
+    ORDER BY cmr.descripcion ASC;
+  `;
+  const { rows } = await pool.query(query);
+  return rows;
+}
+
+// 🔹 Obtener almacenamientos disponibles
+async function obtenerAlmacenamientosDisponibles() {
+  const query = `
+    SELECT 
+      i.id,
+      ca.descripcion,
+      i.cantidad,
+      i.precio,
+      s.nombre AS sucursal
+    FROM inventario i
+    JOIN catalogo_almacenamiento ca ON i.almacenamiento_id = ca.id
+    LEFT JOIN sucursales s ON i.sucursal_id = s.id
+    WHERE i.cantidad > 0
+    ORDER BY ca.descripcion ASC;
+  `;
+  const { rows } = await pool.query(query);
+  return rows;
+}
+
+async function actualizarEquipoArmado(id, data) {
+  const { nombre, procesador, precio, nuevaRamId, nuevaAlmacenamientoId } = data;
+
+  try {
+    await pool.query("BEGIN");
+
+    // Obtener RAM y almacenamiento actuales del equipo
+    const { rows: actuales } = await pool.query(
+      `
+      SELECT 
+        er.memoria_ram_id,
+        ea.almacenamiento_id
+      FROM equipos e
+      LEFT JOIN equipos_ram er ON e.id = er.equipo_id
+      LEFT JOIN equipos_almacenamiento ea ON e.id = ea.equipo_id
+      WHERE e.id = $1
+    `,
+      [id]
+    );
+
+    const { memoria_ram_id: ramActual, almacenamiento_id: stoActual } = actuales[0] || {};
+
+    // Reponer stock de los componentes removidos
+    if (ramActual && ramActual !== nuevaRamId) {
+      await pool.query(
+        `UPDATE inventario SET cantidad = cantidad + 1 WHERE memoria_ram_id = $1`,
+        [ramActual]
+      );
+    }
+    if (stoActual && stoActual !== nuevaAlmacenamientoId) {
+      await pool.query(
+        `UPDATE inventario SET cantidad = cantidad + 1 WHERE almacenamiento_id = $1`,
+        [stoActual]
+      );
+    }
+
+    // Descontar stock de los nuevos componentes
+    if (nuevaRamId && nuevaRamId !== ramActual) {
+      await pool.query(
+        `UPDATE inventario SET cantidad = cantidad - 1 WHERE memoria_ram_id = $1`,
+        [nuevaRamId]
+      );
+    }
+    if (nuevaAlmacenamientoId && nuevaAlmacenamientoId !== stoActual) {
+      await pool.query(
+        `UPDATE inventario SET cantidad = cantidad - 1 WHERE almacenamiento_id = $1`,
+        [nuevaAlmacenamientoId]
+      );
+    }
+
+    // Actualizar datos del equipo principal
+    await pool.query(
+      `
+      UPDATE equipos
+      SET nombre = $1, procesador = $2
+      WHERE id = $3
+    `,
+      [nombre, procesador, id]
+    );
+
+    // Actualizar precio en inventario
+    await pool.query(
+      `UPDATE inventario SET precio = $1 WHERE equipo_id = $2`,
+      [precio, id]
+    );
+
+    // Actualizar relaciones RAM y almacenamiento
+    if (nuevaRamId && nuevaRamId !== ramActual) {
+      await pool.query(
+        `UPDATE equipos_ram SET memoria_ram_id = $1 WHERE equipo_id = $2`,
+        [nuevaRamId, id]
+      );
+    }
+    if (nuevaAlmacenamientoId && nuevaAlmacenamientoId !== stoActual) {
+      await pool.query(
+        `UPDATE equipos_almacenamiento SET almacenamiento_id = $1 WHERE equipo_id = $2`,
+        [nuevaAlmacenamientoId, id]
+      );
+    }
+
+    await pool.query("COMMIT");
+    return { success: true, message: "Equipo armado actualizado correctamente" };
+  } catch (error) {
+    await pool.query("ROLLBACK");
+    console.error("❌ Error al actualizar equipo armado:", error);
+    throw error;
+  }
+}
+
 /** ----------------------------------------------------
  * INSERTAR EQUIPO EN INVENTARIO
  * ---------------------------------------------------- */
@@ -462,4 +589,7 @@ module.exports = {
   insertarEquipoEnInventario,
   eliminarInventario,
   obtenerEquiposArmados,
+  actualizarEquipoArmado,
+  obtenerMemoriasRamDisponibles,
+  obtenerAlmacenamientosDisponibles,
 };

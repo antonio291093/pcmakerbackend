@@ -43,6 +43,10 @@ router.post(
 // Obtener todo inventario (protegida)
 router.get("/", authMiddleware, inventarioController.obtenerInventario);
 
+router.get("/hardware/ram", authMiddleware, inventarioController.obtenerMemoriasRamDisponibles);
+
+router.get("/hardware/almacenamiento", authMiddleware, inventarioController.obtenerAlmacenamientosDisponibles);
+
 router.get(
   "/equipos-armados",
   authMiddleware,
@@ -51,6 +55,13 @@ router.get(
 
 // Actualizar ítem inventario (protegida)
 router.put("/:id", authMiddleware, inventarioController.actualizarInventario);
+
+// 👉 Ruta para actualizar un equipo armado
+router.put(
+  "/equipos-armados/:id",
+  authMiddleware,
+  inventarioController.actualizarEquipoArmado
+);
 
 // Obtener ítem inventario por ID (protegida)
 router.get("/:id", authMiddleware, inventarioController.obtenerInventarioPorId);

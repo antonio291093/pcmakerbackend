@@ -11,11 +11,45 @@ const {
   descontarStockVenta,
   insertarEquipoEnInventario,
   obtenerEquiposArmados,
+  actualizarEquipoArmado,
+  obtenerMemoriasRamDisponibles,
+  obtenerAlmacenamientosDisponibles,
 } = require("../models/inventario");
 
-/** ----------------------------------------------------
- * REGISTRAR EQUIPO EN INVENTARIO
- * ---------------------------------------------------- */
+
+exports.actualizarEquipoArmado = async (req, res) => {
+  const { id } = req.params;
+  const data = req.body;
+
+  try {
+    const resultado = await actualizarEquipoArmado(id, data);
+    res.json(resultado);
+  } catch (error) {
+    console.error("Error en controlador al actualizar equipo armado:", error);
+    res.status(500).json({ message: "Error al actualizar equipo armado" });
+  }
+};
+
+exports.obtenerMemoriasRamDisponibles = async (req, res) => {
+  try {
+    const rams = await obtenerMemoriasRamDisponibles();
+    res.json(rams);
+  } catch (error) {
+    console.error("Error al obtener memorias RAM disponibles:", error);
+    res.status(500).json({ message: "Error en el servidor" });
+  }
+};
+
+exports.obtenerAlmacenamientosDisponibles = async (req, res) => {
+  try {
+    const almacenamientos = await obtenerAlmacenamientosDisponibles();
+    res.json(almacenamientos);
+  } catch (error) {
+    console.error("Error al obtener almacenamientos disponibles:", error);
+    res.status(500).json({ message: "Error en el servidor" });
+  }
+};
+
 exports.registrarEquipo = async (req, res) => {
   try {
     const { equipo_id, sucursal_id, precio } = req.body;
@@ -146,7 +180,6 @@ exports.actualizarInventario = async (req, res) => {
   }
 };
 
-// Eliminar ítem inventario
 exports.eliminarInventario = async (req, res) => {
   const id = parseInt(req.params.id);
   try {
@@ -186,8 +219,7 @@ exports.validarStockInventario = async (req, res) => {
 exports.descontarStockVenta = async (req, res) => {
   try {
     const { productos, sucursal_id } = req.body;
-
-    // 🧩 Validaciones
+    
     if (!sucursal_id || !Array.isArray(productos) || productos.length === 0) {
       return res.status(400).json({
         message: "sucursal_id y al menos un producto son requeridos",
@@ -195,8 +227,7 @@ exports.descontarStockVenta = async (req, res) => {
     }
 
     const resultados = [];
-
-    // 🔁 Descontar cada producto
+   
     for (const item of productos) {
       const { producto_id, cantidad_vendida } = item;
 
@@ -215,7 +246,6 @@ exports.descontarStockVenta = async (req, res) => {
       resultados.push(actualizado);
     }
 
-    // ✅ Todo correcto
     res.status(200).json({
       message: "Stock actualizado correctamente para todos los productos",
       resultados,

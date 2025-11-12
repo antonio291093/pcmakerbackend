@@ -131,8 +131,10 @@ exports.crearInventarioGeneral = async (req, res) => {
 
 exports.obtenerInventario = async (req, res) => {
   try {
-    const items = await obtenerInventario();
-    res.json(items);
+     const { sucursal_id } = req.query;
+
+    const items = await obtenerInventario(sucursal_id);
+    res.json(items);    
   } catch (error) {
     console.error("Error al obtener inventario:", error);
     res.status(500).json({ message: "Error en el servidor" });
@@ -141,7 +143,16 @@ exports.obtenerInventario = async (req, res) => {
 
 exports.obtenerEquiposArmados = async (req, res) => {
   try {
-    const equipos = await obtenerEquiposArmados();
+    let { sucursal_id } = req.query;
+
+    if (sucursal_id === "null" || sucursal_id === "undefined" || !sucursal_id) {
+      sucursal_id = null;
+    } else {
+      sucursal_id = parseInt(sucursal_id);
+      if (isNaN(sucursal_id)) sucursal_id = null;
+    }
+
+    const equipos = await obtenerEquiposArmados(sucursal_id);
     res.json(equipos);
   } catch (error) {
     console.error("Error al obtener equipos armados:", error);

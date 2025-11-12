@@ -4,7 +4,7 @@ const pool = require("../config/db");
 async function obtenerMemoriasRamDisponibles() {
   const query = `
     SELECT 
-      i.id,
+      i.memoria_ram_id AS id,
       cmr.descripcion,
       i.cantidad,
       i.precio,
@@ -23,7 +23,7 @@ async function obtenerMemoriasRamDisponibles() {
 async function obtenerAlmacenamientosDisponibles() {
   const query = `
     SELECT 
-      i.id,
+      i.almacenamiento_id AS id,
       ca.descripcion,
       i.cantidad,
       i.precio,
@@ -39,12 +39,16 @@ async function obtenerAlmacenamientosDisponibles() {
 }
 
 async function actualizarEquipoArmado(id, data) {
-  const { nombre, procesador, precio, nuevaRamId, nuevaAlmacenamientoId } = data;
+  const { nombre, procesador, precio, memorias_ram_ids, almacenamientos_ids } = data;
+
+  console.log("🧠 [INICIO ACTUALIZAR EQUIPO ARMADO]");
+  console.log("📦 ID del equipo:", id);
+  console.log("📩 Datos recibidos:", data);
 
   try {
     await pool.query("BEGIN");
 
-    // Obtener RAM y almacenamiento actuales del equipo
+    // Obtener relaciones actuales
     const { rows: actuales } = await pool.query(
       `
       SELECT 
@@ -58,71 +62,107 @@ async function actualizarEquipoArmado(id, data) {
       [id]
     );
 
-    const { memoria_ram_id: ramActual, almacenamiento_id: stoActual } = actuales[0] || {};
+    const ramsActuales = actuales.map(r => r.memoria_ram_id).filter(Boolean);
+    const almacActuales = actuales.map(a => a.almacenamiento_id).filter(Boolean);
 
-    // Reponer stock de los componentes removidos
-    if (ramActual && ramActual !== nuevaRamId) {
-      await pool.query(
-        `UPDATE inventario SET cantidad = cantidad + 1 WHERE memoria_ram_id = $1`,
-        [ramActual]
-      );
-    }
-    if (stoActual && stoActual !== nuevaAlmacenamientoId) {
-      await pool.query(
-        `UPDATE inventario SET cantidad = cantidad + 1 WHERE almacenamiento_id = $1`,
-        [stoActual]
-      );
+    console.log("💾 RAMs actuales:", ramsActuales);
+    console.log("💾 Almacenamientos actuales:", almacActuales);
+
+    // 🔹 Solo si el frontend envió las memorias RAM
+    if (Array.isArray(memorias_ram_ids)) {
+      const ramsRemovidas = ramsActuales.filter(r => !memorias_ram_ids.includes(r));
+      const ramsAgregadas = memorias_ram_ids.filter(r => !ramsActuales.includes(r));
+
+      console.log("🧩 RAMs removidas:", ramsRemovidas);
+      console.log("🧩 RAMs agregadas:", ramsAgregadas);
+
+      // Reponer stock de las RAM eliminadas
+      for (const ramId of ramsRemovidas) {
+        console.log(`🔼 Reponiendo stock de RAM ID ${ramId}`);
+        await pool.query(
+          `UPDATE inventario SET cantidad = cantidad + 1 WHERE memoria_ram_id = $1`,
+          [ramId]
+        );
+      }
+
+      // Descontar stock de las nuevas RAM
+      for (const ramId of ramsAgregadas) {
+        console.log(`🔽 Descontando stock de nueva RAM ID ${ramId}`);
+        await pool.query(
+          `UPDATE inventario SET cantidad = cantidad - 1 WHERE memoria_ram_id = $1 AND cantidad > 0`,
+          [ramId]
+        );
+      }
+
+      // Limpiar e insertar nuevas RAM
+      await pool.query(`DELETE FROM equipos_ram WHERE equipo_id = $1`, [id]);
+      for (const ramId of memorias_ram_ids) {
+        console.log(`➕ Insertando RAM ID ${ramId} en equipos_ram`);
+        await pool.query(
+          `INSERT INTO equipos_ram (equipo_id, memoria_ram_id) VALUES ($1, $2)`,
+          [id, ramId]
+        );
+      }
+    } else {
+      console.log("⚠️ No se enviaron cambios de RAM, se mantienen las actuales.");
     }
 
-    // Descontar stock de los nuevos componentes
-    if (nuevaRamId && nuevaRamId !== ramActual) {
-      await pool.query(
-        `UPDATE inventario SET cantidad = cantidad - 1 WHERE memoria_ram_id = $1`,
-        [nuevaRamId]
-      );
-    }
-    if (nuevaAlmacenamientoId && nuevaAlmacenamientoId !== stoActual) {
-      await pool.query(
-        `UPDATE inventario SET cantidad = cantidad - 1 WHERE almacenamiento_id = $1`,
-        [nuevaAlmacenamientoId]
-      );
+    // 🔹 Solo si el frontend envió los almacenamientos
+    if (Array.isArray(almacenamientos_ids)) {
+      const almacRemovidos = almacActuales.filter(a => !almacenamientos_ids.includes(a));
+      const almacAgregados = almacenamientos_ids.filter(a => !almacActuales.includes(a));
+
+      console.log("💽 Almacenamientos removidos:", almacRemovidos);
+      console.log("💽 Almacenamientos agregados:", almacAgregados);
+
+      // Reponer stock de los almacenamientos removidos
+      for (const alId of almacRemovidos) {
+        console.log(`🔼 Reponiendo stock de almacenamiento ID ${alId}`);
+        await pool.query(
+          `UPDATE inventario SET cantidad = cantidad + 1 WHERE almacenamiento_id = $1`,
+          [alId]
+        );
+      }
+
+      // Descontar stock de los nuevos almacenamientos
+      for (const alId of almacAgregados) {
+        console.log(`🔽 Descontando stock de nuevo almacenamiento ID ${alId}`);
+        await pool.query(
+          `UPDATE inventario SET cantidad = cantidad - 1 WHERE almacenamiento_id = $1 AND cantidad > 0`,
+          [alId]
+        );
+      }
+
+      // Limpiar e insertar nuevos almacenamientos
+      await pool.query(`DELETE FROM equipos_almacenamiento WHERE equipo_id = $1`, [id]);
+      for (const alId of almacenamientos_ids) {
+        console.log(`➕ Insertando almacenamiento ID ${alId} en equipos_almacenamiento`);
+        await pool.query(
+          `INSERT INTO equipos_almacenamiento (equipo_id, almacenamiento_id) VALUES ($1, $2)`,
+          [id, alId]
+        );
+      }
+    } else {
+      console.log("⚠️ No se enviaron cambios de almacenamiento, se mantienen los actuales.");
     }
 
-    // Actualizar datos del equipo principal
+    // 🔹 Actualizar datos del equipo
+    console.log("✏️ Actualizando datos básicos del equipo...");
     await pool.query(
-      `
-      UPDATE equipos
-      SET nombre = $1, procesador = $2
-      WHERE id = $3
-    `,
+      `UPDATE equipos SET nombre = $1, procesador = $2 WHERE id = $3`,
       [nombre, procesador, id]
     );
 
-    // Actualizar precio en inventario
-    await pool.query(
-      `UPDATE inventario SET precio = $1 WHERE equipo_id = $2`,
-      [precio, id]
-    );
-
-    // Actualizar relaciones RAM y almacenamiento
-    if (nuevaRamId && nuevaRamId !== ramActual) {
-      await pool.query(
-        `UPDATE equipos_ram SET memoria_ram_id = $1 WHERE equipo_id = $2`,
-        [nuevaRamId, id]
-      );
-    }
-    if (nuevaAlmacenamientoId && nuevaAlmacenamientoId !== stoActual) {
-      await pool.query(
-        `UPDATE equipos_almacenamiento SET almacenamiento_id = $1 WHERE equipo_id = $2`,
-        [nuevaAlmacenamientoId, id]
-      );
-    }
+    console.log("💰 Actualizando precio del inventario del equipo...");
+    await pool.query(`UPDATE inventario SET precio = $1 WHERE equipo_id = $2`, [precio, id]);
 
     await pool.query("COMMIT");
+    console.log("✅ [COMMIT] Equipo armado actualizado correctamente");
+
     return { success: true, message: "Equipo armado actualizado correctamente" };
   } catch (error) {
     await pool.query("ROLLBACK");
-    console.error("❌ Error al actualizar equipo armado:", error);
+    console.error("❌ [ROLLBACK] Error al actualizar equipo armado:", error);
     throw error;
   }
 }
@@ -277,11 +317,8 @@ async function agregarOActualizarInventario({
   }
 }
 
-/** ----------------------------------------------------
- * OBTENER TODO EL INVENTARIO
- * ---------------------------------------------------- */
-async function obtenerInventario() {
-  const query = `
+async function obtenerInventario(sucursalId = null) {
+  let query = `
     SELECT 
       i.id,
       i.tipo,
@@ -298,14 +335,22 @@ async function obtenerInventario() {
     LEFT JOIN catalogo_memoria_ram cm ON i.memoria_ram_id = cm.id
     LEFT JOIN catalogo_almacenamiento ca ON i.almacenamiento_id = ca.id
     WHERE i.equipo_id IS NULL
-    ORDER BY i.id ASC;
   `;
-  const { rows } = await pool.query(query);
+
+  const values = [];
+  if (sucursalId) {
+    values.push(sucursalId);
+    query += ` AND i.sucursal_id = $${values.length}`;
+  }
+
+  query += " ORDER BY i.id ASC;";
+
+  const { rows } = await pool.query(query, values);
   return rows;
 }
 
-async function obtenerEquiposArmados() {
-  const query = `
+async function obtenerEquiposArmados(sucursalId = null) {
+  let query = `
     SELECT 
       e.id,
       e.nombre,
@@ -341,9 +386,17 @@ async function obtenerEquiposArmados() {
     JOIN lotes_etiquetas le ON e.lote_etiqueta_id = le.id
     LEFT JOIN sucursales s ON e.sucursal_id = s.id
     WHERE e.estado_id = 4 -- Armado
-    ORDER BY e.id ASC;
   `;
-  const { rows } = await pool.query(query);
+
+  const values = [];
+  if (sucursalId && !isNaN(sucursalId)) {
+    values.push(Number(sucursalId));
+    query += ` AND e.sucursal_id = $${values.length}`;
+  }
+
+  query += " ORDER BY e.id ASC;";
+
+  const { rows } = await pool.query(query, values);
   return rows;
 }
 
